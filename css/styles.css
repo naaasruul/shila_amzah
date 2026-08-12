@@ -1,0 +1,219 @@
+:root {
+    --primary: #1f4e78;
+    --primary-hover: #163a5c;
+    --bg: #f4f6f9;
+    --card-bg: #ffffff;
+    --text: #333333;
+    --border: #d9d9d9;
+    --alt-row: #f8fafc;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+body {
+    background-color: var(--bg);
+    color: var(--text);
+    padding: 20px;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+header {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    background: var(--card-bg);
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+h1 {
+    color: var(--primary);
+    font-size: 1.4rem;
+}
+
+.toolbar-group {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.btn {
+    background: var(--primary);
+    color: white;
+    border: none;
+    padding: 10px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.9rem;
+    transition: background 0.2s;
+}
+
+.btn:hover {
+    background: var(--primary-hover);
+}
+
+.btn-success { background: #27ae60; }
+.btn-success:hover { background: #219150; }
+.btn-secondary { background: #6c757d; }
+.btn-secondary:hover { background: #5a6268; }
+.btn-danger { background: #e74c3c; }
+.btn-danger:hover { background: #c0392b; }
+
+.btn-sm {
+    padding: 4px 8px;
+    font-size: 0.8rem;
+}
+
+.tabs-nav {
+    display: flex;
+    gap: 5px;
+    overflow-x: auto;
+    background: var(--card-bg);
+    padding: 10px 10px 0 10px;
+    border-radius: 8px 8px 0 0;
+    border-bottom: 2px solid var(--primary);
+}
+
+.tab-btn {
+    padding: 10px 18px;
+    border: none;
+    background: #e9ecef;
+    color: #495057;
+    cursor: pointer;
+    border-radius: 6px 6px 0 0;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.tab-btn.active {
+    background: var(--primary);
+    color: white;
+}
+
+.tab-btn-add {
+    background: #28a745;
+    color: white;
+}
+
+.content-card {
+    background: var(--card-bg);
+    padding: 20px;
+    border-radius: 0 0 8px 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.search-box {
+    padding: 8px 12px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    width: 250px;
+    font-size: 0.9rem;
+}
+
+.table-responsive { overflow-x: auto; }
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.95rem;
+}
+
+th, td {
+    padding: 12px 15px;
+    border: 1px solid var(--border);
+    text-align: left;
+}
+
+th {
+    background: var(--primary);
+    color: white;
+    font-weight: 600;
+}
+
+tr:nth-child(even) { background-color: var(--alt-row); }
+
+.action-btns { display: flex; gap: 5px; }
+
+.status-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 10px;
+    font-size: 0.95rem;
+    color: #555;
+}
+
+.modal {
+    display: none;
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: rgba(0,0,0,0.5);
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.modal.active { display: flex; }
+
+.modal-body {
+    background: white;
+    padding: 25px;
+    border-radius: 8px;
+    width: 420px;
+    max-width: 90%;
+}
+
+.modal-body h3 { margin-bottom: 15px; color: var(--primary); }
+
+.form-group { margin-bottom: 12px; }
+
+.form-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+.form-group input {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+}
+
+.modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 20px;
+}
+
+@media (max-width: 720px) {
+    .toolbar, header { flex-direction: column; align-items: stretch; }
+    .toolbar-group { width: 100%; justify-content: space-between; }
+    .search-box { width: 100%; }
+}
