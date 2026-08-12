@@ -247,6 +247,25 @@ function saveNewTab(event) {
     switchTab(tabName);
 }
 
+function sheetToRecords(sheet) {
+    const rawRows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+    const headerRowIndex = rawRows.findIndex((row) =>
+        row.some((cell) => String(cell).trim().toLowerCase() === 'no.')
+    );
+    const startIndex = headerRowIndex === -1 ? 0 : headerRowIndex;
+    const headers = (rawRows[startIndex] || []).map((cell, i) => String(cell).trim() || `Column${i + 1}`);
+
+    return rawRows.slice(startIndex + 1)
+        .filter((row) => row.some((cell) => String(cell).trim() !== ''))
+        .map((row) => {
+            const record = {};
+            headers.forEach((header, i) => {
+                record[header] = row[i] ?? '';
+            });
+            return record;
+        });
+}
+
 function importDataFromFile(event) {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -264,7 +283,7 @@ function importDataFromFile(event) {
                 const imported = {};
                 workbook.SheetNames.forEach((sheetName) => {
                     const sheet = workbook.Sheets[sheetName];
-                    imported[sheetName] = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+                    imported[sheetName] = sheetToRecords(sheet);
                 });
                 mergeImportData(imported, true);
             }
