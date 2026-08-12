@@ -9,3 +9,9 @@ window.firebaseConfig = {
     messagingSenderId: "6098169230",
     appId: "1:6098169230:web:d98baf84060047c3d348df"
   };
+
+// App Check reCAPTCHA v3 site key. Register one at
+// https://www.google.com/recaptcha/admin (score-based v3, add your site's
+// domain), then paste the site key below. Until this is set, the app
+// still works but Firestore access is NOT protected by App Check.
+window.recaptchaSiteKey = "";

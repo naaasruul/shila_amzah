@@ -1,0 +1,28 @@
+rules_version = '2';
+
+// This project's Firebase web config (API key/project ID) is public by
+// design (that's normal for Firebase web apps) and the app has no login,
+// so the ONLY real gate on this data is these rules + App Check.
+//
+// App Check (see index.html / js/app.js) attaches a verified attestation
+// token to every request from the real deployed site. request.app != null
+// means "this request came with a valid App Check token" - it rejects
+// anyone who copies firebase-config.js into their own script or calls
+// Firestore directly via curl/Postman/the SDK from an unregistered app.
+//
+// For defense in depth, also turn on "Enforce App Check" for Firestore
+// in the Firebase console (see MANUAL_SECURITY_STEPS.md) - that blocks
+// requests at the infrastructure level even if these rules were ever
+// misconfigured.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /app/state {
+      allow read, write: if request.app != null;
+    }
+
+    // Deny everything else by default.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

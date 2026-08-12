@@ -1,6 +1,157 @@
 ﻿const DEFAULT_APP_DATA = {};
 
 const FIRESTORE_DOC_PATH = 'app/state';
+
+// Old client spreadsheets spelled the IC column differently per sheet
+// (No. IC, IC No, Kad Pengenalan, Identity Card ID, ...). Map every
+// known variant to one canonical header so it's a single, maskable field
+// instead of N inconsistent columns.
+const HEADER_ALIASES = {
+    'no. ic': 'No. IC',
+    'no ic': 'No. IC',
+    'ic no': 'No. IC',
+    'ic no.': 'No. IC',
+    'ic number': 'No. IC',
+    'no. kad pengenalan': 'No. IC',
+    'no kad pengenalan': 'No. IC',
+    'kad pengenalan': 'No. IC',
+    'nombor kad pengenalan': 'No. IC',
+    'identity card': 'No. IC',
+    'identity card id': 'No. IC',
+    'identity card no': 'No. IC',
+    'identity card number': 'No. IC',
+    'nric': 'No. IC',
+    'nric no': 'No. IC',
+
+    // Some sellers/reps list every attendee by name (1 row = 1 ticket).
+    // Others act as a "wakil" and just report a bulk count for the group
+    // they represent (1 row = N tickets). Both styles get normalized to
+    // this one column so the dashboard can add them up consistently.
+    'bilangan tiket': 'Bilangan Tiket',
+    'bil tiket': 'Bilangan Tiket',
+    'no. tiket': 'Bilangan Tiket',
+    'nombor tiket': 'Bilangan Tiket',
+    'jumlah tiket': 'Bilangan Tiket',
+    'qty': 'Bilangan Tiket',
+    'quantity': 'Bilangan Tiket',
+    'bilangan peserta': 'Bilangan Tiket',
+    'jumlah peserta': 'Bilangan Tiket',
+    'bilangan orang': 'Bilangan Tiket',
+    'jumlah orang': 'Bilangan Tiket',
+    'bil peserta': 'Bilangan Tiket',
+    'peserta': 'Bilangan Tiket',
+    'participants': 'Bilangan Tiket',
+    'number of tickets': 'Bilangan Tiket',
+    'no of tickets': 'Bilangan Tiket',
+};
+
+const TICKET_HEADER = 'Bilangan Tiket';
+
+// A row without this column (a plain name list) is 1 named person = 1
+// ticket. A row with it holds however many tickets that entry covers,
+// whether that's an individually listed attendee or a wakil's bulk count.
+function getRowTicketCount(row) {
+    const raw = row?.[TICKET_HEADER];
+    const num = parseInt(raw, 10);
+    return Number.isFinite(num) && num > 0 ? num : 1;
+}
+
+// Old sheets like "Attendees"/"Fans" only ever listed names one by one,
+// so they never got a quantity column. Add it everywhere so any tab can
+// take a single bulk entry (e.g. "Wakil X - 100 tiket") without forcing
+// every attendee to be typed in by name.
+function ensureTicketHeaderOnAllTabs() {
+    Object.values(appData).forEach((tabData) => {
+        if (!tabData.headers.includes(TICKET_HEADER)) {
+            tabData.headers.push(TICKET_HEADER);
+        }
+    });
+}
+
+function computeDashboardStats() {
+    const perTab = Object.entries(appData).map(([tabName, data]) => {
+        const rows = data.rows || [];
+        const tickets = rows.reduce((sum, row) => sum + getRowTicketCount(row), 0);
+        return { tabName, entries: rows.length, tickets };
+    });
+    const totalTickets = perTab.reduce((sum, t) => sum + t.tickets, 0);
+    const totalEntries = perTab.reduce((sum, t) => sum + t.entries, 0);
+    return { perTab, totalTickets, totalEntries };
+}
+
+function renderDashboard() {
+    const container = document.getElementById('dashboardSummary');
+    if (!container) return;
+
+    const { perTab, totalTickets, totalEntries } = computeDashboardStats();
+    container.innerHTML = '';
+
+    const ticketCard = document.createElement('div');
+    ticketCard.className = 'dashboard-card';
+    ticketCard.innerHTML = '<div class="dashboard-label">Jumlah Tiket</div>';
+    const ticketValue = document.createElement('div');
+    ticketValue.className = 'dashboard-value';
+    ticketValue.textContent = totalTickets;
+    ticketCard.appendChild(ticketValue);
+
+    const entryCard = document.createElement('div');
+    entryCard.className = 'dashboard-card';
+    entryCard.innerHTML = '<div class="dashboard-label">Jumlah Rekod</div>';
+    const entryValue = document.createElement('div');
+    entryValue.className = 'dashboard-value';
+    entryValue.textContent = totalEntries;
+    entryCard.appendChild(entryValue);
+
+    const breakdown = document.createElement('div');
+    breakdown.className = 'dashboard-breakdown';
+    breakdown.innerHTML = '<div class="dashboard-label">Mengikut Tab</div>';
+    perTab.forEach(({ tabName, tickets, entries }) => {
+        const row = document.createElement('div');
+        row.className = 'dashboard-breakdown-row';
+        const nameSpan = document.createElement('span');
+        nameSpan.textContent = tabName;
+        const valueSpan = document.createElement('span');
+        valueSpan.textContent = `${tickets} tiket (${entries} rekod)`;
+        row.appendChild(nameSpan);
+        row.appendChild(valueSpan);
+        breakdown.appendChild(row);
+    });
+
+    container.appendChild(ticketCard);
+    container.appendChild(entryCard);
+    container.appendChild(breakdown);
+}
+
+const SENSITIVE_HEADER_PATTERN = /\bic\b|kad pengenalan|identity card|nric/i;
+
+function normalizeHeader(raw) {
+    const trimmed = String(raw ?? '').trim();
+    const alias = HEADER_ALIASES[trimmed.toLowerCase()];
+    return alias || trimmed;
+}
+
+function isSensitiveHeader(header) {
+    return SENSITIVE_HEADER_PATTERN.test(String(header ?? ''));
+}
+
+function maskSensitiveValue(value) {
+    const str = String(value ?? '');
+    if (str.length <= 4) return '•'.repeat(str.length);
+    return '•'.repeat(str.length - 4) + str.slice(-4);
+}
+
+function formatCellValue(header, value) {
+    if (isSensitiveHeader(header) && value) {
+        return maskSensitiveValue(value);
+    }
+    return value ?? '-';
+}
+
+function toggleMaskedCell(td) {
+    const revealed = td.dataset.revealed === 'true';
+    td.textContent = revealed ? maskSensitiveValue(td.dataset.raw) : td.dataset.raw;
+    td.dataset.revealed = revealed ? 'false' : 'true';
+}
 let appData = {};
 let activeTab = '';
 let editingIndex = -1;
@@ -21,6 +172,13 @@ function initFirebase() {
         if (!firebase.apps.length) {
             firebase.initializeApp(window.firebaseConfig);
         }
+
+        if (window.recaptchaSiteKey && firebase.appCheck) {
+            firebase.appCheck().activate(window.recaptchaSiteKey, true);
+        } else {
+            console.warn('App Check not activated: set window.recaptchaSiteKey in js/firebase-config.js.');
+        }
+
         firestoreDb = firebase.firestore();
     } catch (error) {
         console.warn('Firebase initialization failed:', error);
@@ -110,8 +268,19 @@ function renderTabs() {
         const btn = document.createElement('button');
         btn.className = `tab-btn ${tabName === activeTab ? 'active' : ''}`;
         btn.type = 'button';
-        btn.innerText = tabName;
         btn.addEventListener('click', () => switchTab(tabName));
+
+        const label = document.createElement('span');
+        label.textContent = tabName;
+        btn.appendChild(label);
+
+        const closeBtn = document.createElement('span');
+        closeBtn.className = 'tab-btn-close';
+        closeBtn.textContent = '×';
+        closeBtn.title = `Padam tab "${tabName}"`;
+        closeBtn.addEventListener('click', (event) => deleteTab(tabName, event));
+        btn.appendChild(closeBtn);
+
         tabsNav.appendChild(btn);
     });
 
@@ -135,27 +304,63 @@ function renderTable() {
     const tableHead = document.getElementById('tableHead');
     const tableBody = document.getElementById('tableBody');
 
-    let headerHTML = '<tr>';
+    if (!currentData) {
+        tableHead.innerHTML = '';
+        tableBody.innerHTML = '';
+        renderDashboard();
+        return;
+    }
+
+    const headerRow = document.createElement('tr');
     currentData.headers.forEach((h) => {
-        headerHTML += `<th>${h}</th>`;
+        const th = document.createElement('th');
+        th.textContent = h;
+        headerRow.appendChild(th);
     });
-    headerHTML += '<th>Tindakan</th></tr>';
-    tableHead.innerHTML = headerHTML;
+    const actionsHeader = document.createElement('th');
+    actionsHeader.textContent = 'Tindakan';
+    headerRow.appendChild(actionsHeader);
+    tableHead.innerHTML = '';
+    tableHead.appendChild(headerRow);
 
     tableBody.innerHTML = '';
     currentData.rows.forEach((row, idx) => {
-        let rowHTML = '<tr>';
+        const tr = document.createElement('tr');
         currentData.headers.forEach((h) => {
-            rowHTML += `<td>${row[h] ?? '-'}</td>`;
+            const td = document.createElement('td');
+            td.textContent = formatCellValue(h, row[h]);
+            if (isSensitiveHeader(h) && row[h]) {
+                td.classList.add('masked-cell');
+                td.title = 'Klik untuk papar/sembunyi';
+                td.dataset.raw = row[h];
+                td.dataset.revealed = 'false';
+                td.addEventListener('click', () => toggleMaskedCell(td));
+            }
+            tr.appendChild(td);
         });
-        rowHTML += `
-            <td class="action-btns">
-                <button class="btn btn-sm btn-secondary" type="button" onclick="openEntryModal(${idx})">Edit</button>
-                <button class="btn btn-sm btn-danger" type="button" onclick="deleteEntry(${idx})">Padam</button>
-            </td>`;
-        rowHTML += '</tr>';
-        tableBody.innerHTML += rowHTML;
+
+        const actionsTd = document.createElement('td');
+        actionsTd.className = 'action-btns';
+
+        const editBtn = document.createElement('button');
+        editBtn.className = 'btn btn-sm btn-secondary';
+        editBtn.type = 'button';
+        editBtn.textContent = 'Edit';
+        editBtn.addEventListener('click', () => openEntryModal(idx));
+
+        const delBtn = document.createElement('button');
+        delBtn.className = 'btn btn-sm btn-danger';
+        delBtn.type = 'button';
+        delBtn.textContent = 'Padam';
+        delBtn.addEventListener('click', () => deleteEntry(idx));
+
+        actionsTd.appendChild(editBtn);
+        actionsTd.appendChild(delBtn);
+        tr.appendChild(actionsTd);
+        tableBody.appendChild(tr);
     });
+
+    renderDashboard();
 }
 
 function filterTable() {
@@ -175,11 +380,23 @@ function openEntryModal(index = -1) {
     currentData.headers.forEach((h) => {
         if (h === 'No.') return;
         const value = index >= 0 ? currentData.rows[index][h] ?? '' : '';
-        formFields.innerHTML += `
-            <div class="form-group">
-                <label>${h}</label>
-                <input type="text" id="field_${h}" value="${value}" ${h === 'Nama' ? 'required' : ''}>
-            </div>`;
+
+        const group = document.createElement('div');
+        group.className = 'form-group';
+
+        const label = document.createElement('label');
+        label.textContent = h;
+
+        const input = document.createElement('input');
+        input.type = h === TICKET_HEADER ? 'number' : 'text';
+        if (h === TICKET_HEADER) input.min = '1';
+        input.id = `field_${h}`;
+        input.value = value;
+        if (h === 'Nama') input.required = true;
+
+        group.appendChild(label);
+        group.appendChild(input);
+        formFields.appendChild(group);
     });
 
     document.getElementById('entryModal').classList.add('active');
@@ -241,10 +458,23 @@ function saveNewTab(event) {
         return;
     }
 
-    appData[tabName] = { headers: ['No.', 'Nama', 'Nombor Telefon', 'Catatan'], rows: [] };
+    appData[tabName] = { headers: ['No.', 'Nama', 'Nombor Telefon', TICKET_HEADER, 'Catatan'], rows: [] };
     document.getElementById('newTabName').value = '';
     closeTabModal();
     switchTab(tabName);
+}
+
+function deleteTab(tabName, event) {
+    event.stopPropagation();
+    if (!confirm(`Padam tab "${tabName}"? Semua rekod dalam tab ini akan dipadam.`)) return;
+
+    delete appData[tabName];
+    if (activeTab === tabName) {
+        activeTab = Object.keys(appData)[0];
+    }
+    saveAppState();
+    renderTabs();
+    renderTable();
 }
 
 function sheetToRecords(sheet) {
@@ -253,7 +483,7 @@ function sheetToRecords(sheet) {
         row.some((cell) => String(cell).trim().toLowerCase() === 'no.')
     );
     const startIndex = headerRowIndex === -1 ? 0 : headerRowIndex;
-    const headers = (rawRows[startIndex] || []).map((cell, i) => String(cell).trim() || `Column${i + 1}`);
+    const headers = (rawRows[startIndex] || []).map((cell, i) => normalizeHeader(cell) || `Column${i + 1}`);
 
     return rawRows.slice(startIndex + 1)
         .filter((row) => row.some((cell) => String(cell).trim() !== ''))
@@ -287,6 +517,10 @@ function importDataFromFile(event) {
                 });
                 mergeImportData(imported, true);
             }
+            if (!activeTab || !appData[activeTab]) {
+                activeTab = Object.keys(appData)[0];
+            }
+            ensureTicketHeaderOnAllTabs();
             saveAppState();
             renderTabs();
             renderTable();
@@ -344,20 +578,30 @@ function mergeImportData(imported, isExcel = false) {
     mergeTabData(activeTab, Array.isArray(imported) ? imported : [imported]);
 }
 
+function normalizeRowKeys(row) {
+    const normalized = {};
+    Object.entries(row).forEach(([key, value]) => {
+        normalized[normalizeHeader(key)] = value;
+    });
+    return normalized;
+}
+
 function mergeTabData(tabName, rows) {
+    const normalizedRows = rows.map(normalizeRowKeys);
+
     if (!appData[tabName]) {
-        const sampleHeaders = rows.length ? Object.keys(rows[0]) : ['No.', 'Nama', 'Nombor Telefon'];
+        const sampleHeaders = normalizedRows.length ? Object.keys(normalizedRows[0]) : ['No.', 'Nama', 'Nombor Telefon'];
         appData[tabName] = { headers: ['No.', ...sampleHeaders.filter((h) => h !== 'No.')], rows: [] };
     }
 
     const destination = appData[tabName];
     const headers = destination.headers;
 
-    rows.forEach((row) => {
+    normalizedRows.forEach((row) => {
         const record = { 'No.': destination.rows.length + 1 };
         headers.forEach((header) => {
             if (header === 'No.') return;
-            record[header] = row[header] ?? row[header.replace(/\s+/g, ' ')] ?? '';
+            record[header] = row[header] ?? '';
         });
         destination.rows.push(record);
     });
@@ -409,6 +653,7 @@ function updateSyncStatus(message = 'Menunggu status...') {
 window.addEventListener('DOMContentLoaded', async () => {
     initFirebase();
     await loadData();
+    ensureTicketHeaderOnAllTabs();
     renderTabs();
     renderTable();
     updateSyncStatus('Sedia');
