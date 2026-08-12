@@ -607,20 +607,38 @@ function mergeTabData(tabName, rows) {
     });
 }
 
-function exportAllToExcel() {
-    const wb = XLSX.utils.book_new();
+async function exportAllToExcel() {
+    // The free build of the xlsx (SheetJS) library used for import/CSV
+    // can't write cell styling, so colored headers need ExcelJS instead.
+    const workbook = new ExcelJS.Workbook();
+
     Object.entries(appData).forEach(([tabName, sheetData]) => {
-        const rows = sheetData.rows.map((row) => {
-            const rowObj = {};
-            sheetData.headers.forEach((h) => {
-                rowObj[h] = row[h];
-            });
-            return rowObj;
+        const worksheet = workbook.addWorksheet(tabName.substring(0, 31));
+
+        const headerRow = worksheet.addRow(sheetData.headers);
+        headerRow.eachCell((cell) => {
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F4E78' } };
+            cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
         });
-        const ws = XLSX.utils.json_to_sheet(rows, { header: sheetData.headers });
-        XLSX.utils.book_append_sheet(wb, ws, tabName.substring(0, 31));
+
+        sheetData.rows.forEach((row) => {
+            worksheet.addRow(sheetData.headers.map((h) => row[h] ?? ''));
+        });
+
+        sheetData.headers.forEach((h, i) => {
+            worksheet.getColumn(i + 1).width = Math.max(12, h.length + 2);
+        });
     });
-    XLSX.writeFile(wb, 'Konsert_Shila_Amzah_Kemaskini.xlsx');
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: 'application/octet-stream' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = 'Konsert_Shila_Amzah_Kemaskini.xlsx';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(link.href);
 }
 
 function exportCurrentTabCSV() {
