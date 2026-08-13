@@ -1,6 +1,6 @@
 ﻿const DEFAULT_APP_DATA = {};
 
-const FIRESTORE_DOC_PATH = 'app_stage/state';
+const FIRESTORE_DOC_PATH = 'app/state';
 
 // Old client spreadsheets spelled the IC column differently per sheet
 // (No. IC, IC No, Kad Pengenalan, Identity Card ID, ...). Map every
