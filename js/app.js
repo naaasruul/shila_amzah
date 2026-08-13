@@ -1,6 +1,6 @@
 ﻿const DEFAULT_APP_DATA = {};
 
-const FIRESTORE_DOC_PATH = 'app/state';
+const FIRESTORE_DOC_PATH = 'app_stage/state';
 
 // Old client spreadsheets spelled the IC column differently per sheet
 // (No. IC, IC No, Kad Pengenalan, Identity Card ID, ...). Map every
@@ -274,6 +274,13 @@ function renderTabs() {
         label.textContent = tabName;
         btn.appendChild(label);
 
+        const renameBtn = document.createElement('span');
+        renameBtn.className = 'tab-btn-rename';
+        renameBtn.textContent = '✎';
+        renameBtn.title = `Tukar nama tab "${tabName}"`;
+        renameBtn.addEventListener('click', (event) => renameTab(tabName, event));
+        btn.appendChild(renameBtn);
+
         const closeBtn = document.createElement('span');
         closeBtn.className = 'tab-btn-close';
         closeBtn.textContent = '×';
@@ -462,6 +469,36 @@ function saveNewTab(event) {
     document.getElementById('newTabName').value = '';
     closeTabModal();
     switchTab(tabName);
+}
+
+function renameTab(tabName, event) {
+    event.stopPropagation();
+    const newName = prompt('Nama tab baru:', tabName);
+    if (newName === null) return;
+
+    const trimmed = newName.trim();
+    if (!trimmed || trimmed === tabName) return;
+    if (appData[trimmed]) {
+        alert('Nama tab sudah wujud. Sila cuba nama lain.');
+        return;
+    }
+
+    // Rebuild appData with the key renamed in place so tab order in the
+    // Firestore doc (and the UI) doesn't shuffle - same document shape,
+    // just a different key for this tab.
+    const reordered = {};
+    Object.keys(appData).forEach((key) => {
+        reordered[key === tabName ? trimmed : key] = appData[key];
+    });
+    appData = reordered;
+
+    if (activeTab === tabName) {
+        activeTab = trimmed;
+    }
+
+    saveAppState();
+    renderTabs();
+    renderTable();
 }
 
 function deleteTab(tabName, event) {

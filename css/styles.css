@@ -169,7 +169,8 @@ h1 {
     gap: 8px;
 }
 
-.tab-btn-close {
+.tab-btn-close,
+.tab-btn-rename {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -185,6 +186,11 @@ h1 {
     opacity: 1;
     background: rgba(220, 53, 69, 0.85);
     color: white;
+}
+
+.tab-btn-rename:hover {
+    opacity: 1;
+    background: rgba(255, 255, 255, 0.35);
 }
 
 .tab-btn.active {
